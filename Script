@@ -1,0 +1,172 @@
+#!/bin/bash
+boolean=0
+while [ $boolean -eq 0 ];
+do
+    echo -n -e "Enter the month you would like the email to be sent on (all for every month):\n"
+    #stores the month in the month variable.
+    read month
+    case $month in
+        January|january|1) month=1 boolean=1 ;;
+        February|february|2) month=2 boolean=1 ;;
+        March|march|3) month=3 boolean=1 ;;
+        April|april|4) month=4 boolean=1 ;;
+        May|may|5) month=5 boolean=1 ;;
+        June|june|6) month=6 boolean=1 ;;
+        July|july|7) month=7 boolean=1 ;;
+        August|august|8) month=8 boolean=1 ;;
+        September|september|9) month=9 boolean=1 ;;
+        October|october|10) month=10 boolean=1 ;;
+        November|november|11) month=11 boolean=1 ;;
+        December|december|12) month=12 boolean=1 ;;
+    All|all) month=* boolean=1 ;;
+        *) echo "Invalid month, please try again."
+    esac
+#Closes first while loop (proper month checker).
+done
+
+boolean2=0
+while [ $boolean2 -eq 0 ];
+do
+    echo -n -e "Enter the day of the month or weekday you would like the email to be sent on (all for every day):\n"
+    #stores the day of the month in the DoM variable.
+    read temp
+    #Checks to see if the user wants to use either day of month or week day and assigns the other * value.
+    number='^[0-9]+$'
+    if ! [[ $temp =~ $number ]] ; then
+        case $temp in
+        Sunday|sunday|0) day=0 boolean2=1 DoM=* ;;
+        Monday|monday|1) day=1 boolean2=1 DoM=* ;;
+        Tuesday|tuesday|2) day=2 boolean2=1 DoM=* ;;
+        Wednesday|wednesday|3) day=3 boolean2=1 DoM=* ;;
+        Thursday|thursday|4) day=4 boolean2=1 DoM=* ;;
+        Friday|friday|5) day=5 boolean2=1 DoM=* ;;
+        Saturday|saturday|6) day=6 boolean2=1 DoM=* ;;
+    All|all) day=* boolean2=1 DoM=* ;;
+        *) echo "Invalid weekday, please try again."
+        esac
+    #Checks to see if the number of days is equal to or less than 31 days.  
+    elif [ $temp -le 31 ] ; then
+        DoM=$temp
+        day=*
+        boolean2=1
+    else
+        echo "Invalid day of month, please try again."
+    fi
+#Closes second while loop (weekday and day of month checker).
+done
+
+boolean3=0
+while [ $boolean3 -eq 0 ];
+do
+    echo -n -e "Enter the hour you would like the email to be sent on (24 hour format - all for every hour):\n"
+    #stores the hour in the hour variable.
+    read hour
+    if [ "$hour" == "all" ] ; then
+        hour=*
+        boolean3=1
+        elif [ $hour -le 23 ] ; then
+        boolean3=1
+        else
+        echo "Invalid number of hours (max 23!), please try again"
+        fi
+#Closes third while loop (hour <23 checker)
+done
+
+boolean4=0
+while [ $boolean4 -eq 0 ];
+do
+    echo -n -e "Enter the minutes you would like the email to be sent on (all for every minute):\n"
+    #stores the minutes in the minutes variable.
+    read minutes
+    #minutesChecker='^*([0-5]|[0-9])+$'
+    if [ "$minutes" == "all" ] ; then
+        minutes=*
+        boolean4=1
+    #elif [[ $minutes =~ $minutesChecker ]] ; then
+        #boolean4=1   
+    elif [ $minutes -le 59 ] ; then
+            boolean4=1
+        else
+            echo "Invalid number of minutes (max 59), please try again"
+        fi
+#Closes fourth while loop (minutes <59 checker)
+done
+
+               ########## DEBUGGER #############
+#echo "You entered $month the $DoM on $day at $hour:$minutes"
+
+boolean5=0
+while [ $boolean5 -eq 0 ];
+do
+    echo -n -e "Enter the e-mail address of the recipient:\n"
+    read email
+    emailChecker='^[a-zA-Z0-9._]*@[a-zA-Z0-9]*\.[a-zA-Z0-9]*$'
+    if [[ $email =~ $emailChecker ]] ; then
+        boolean5=1
+    else
+        echo "Invalid e-mail address, please try again"
+    fi
+
+#Closes fifth while loop (email address format checker)
+done
+
+echo -n -e "Enter the subject line of the e-mail:\n"
+read subject
+
+echo -n -e "Enter the body message of the e-mail:\n"
+read message
+
+echo -n -e "Would you like to add an attachment in the e-mail? (y/n)\n"
+read response
+boolean6=0
+while [ $boolean6 -eq 0 ];
+    do
+        case $response in
+            y|Y) echo -n -e "Enter the full path of the attachment:\n"
+                read attachment
+                if [ -f $attachment ] ; then
+                    boolean6=1
+                else
+                    echo "Unable to find file - please try again"
+                fi ;;
+            *) attachment=n boolean6=1
+        esac
+#Closes sixth while loop (file exists checker)
+done
+
+               ########## DEBUGGER #############
+#echo "Subject: $subject. Body: $message. Attachment: $response. Attachment path: $attachment."
+
+#Creates a new tmp folder and script in that temp directory named "mycron" with the mail/mutt command in it (to be executed later by crontab)
+#if the folder doesn't exist, create the foler if it does exists (script has been ran before) then just execute code
+if [ ! -d /tmp/mailKJ ] ; then
+    mkdir /tmp/mailKJ
+fi
+if [ $response = "y" -o "Y" ] ; then
+    echo -e "#!/bin/bash \n 
+        echo '$message' | mutt $email -a $attachment -s '$subject'" > /tmp/mailKJ/mycron
+    #if there is no attachment selected/wanted, then just send email with no attachment.
+    else
+        echo -e "#!/bin/bash \n 
+            echo '$message' | mutt $email -s '$subject'" > /tmp/mailKJ/mycron
+fi
+
+#Change permissions to the newly created mycron file.
+chmod 755 /tmp/mailKJ/mycron
+
+               ########## DEBUGGER #############
+#echo "After script has been created. Subject: $subject. Body: $message. Attachment: $response. Attachment path: $attachment."      
+
+
+#Checks to see if the exact same line exists in the /etc/crontab file.
+if ! grep -Fxq "$minutes $hour $DoM $month $day /tmp/mailKJ/mycron" /etc/crontab ; then
+        #Appends the newly made script to the crontab with a schedule based on user inputs.
+    echo "$minutes $hour $DoM $month $day /tmp/mailKJ/mycron" >> /etc/crontab
+fi
+
+
+               ########## DEBUGGER #############
+#echo "After the script has been appended to crontab. Minutes: $minutes. hour: $hour. Date of Month: $DoM. month: $month day: $day."
+
+#This will assign the crontab file in /etc/crontab to the current working crontab scheduler and run it.
+crontab /etc/crontab
